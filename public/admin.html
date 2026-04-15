@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin Panel - StartInno Hackathon</title>
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/admin-style.css">
+</head>
+<body>
+
+<div id="loginContainer" class="login-container">
+  <div class="login-box">
+    <h1>🔐 Admin Login</h1>
+    <p class="subtitle">StartInno Hackathon Platform</p>
+    
+    <input type="email" id="loginEmail" placeholder="Email">
+    <input type="password" id="loginPassword" placeholder="Password">
+    
+    <button onclick="adminLogin()" class="btn-primary">Login</button>
+  </div>
+</div>
+
+<div id="adminContainer" class="admin-container" style="display:none;">
+  <nav class="admin-navbar">
+    <div class="navbar-left">
+      <h1>🚀 StartInno Admin - Problem Statements</h1>
+    </div>
+    <div class="navbar-right">
+      <button onclick="uploadFromDriveLink()" class="btn-upload-drive" title="Upload file from drive link">☁️ Upload</button>
+      <button onclick="deleteUploadedFile()" class="btn-delete-file" title="Delete uploaded file">🗑️ Delete File</button>
+      <button onclick="deleteAllTeamsAndSubmissions()" class="btn-remove-all" title="Delete all teams and submissions">🗑️ Remove All</button>
+      <button onclick="openChangePasswordModal()" class="btn-change-pwd" title="Change admin password">🔑 Change Password</button>
+      <span id="adminEmail"></span>
+      <button onclick="adminLogout()" class="btn-secondary">Logout</button>
+    </div>
+  </nav>
+
+  <div class="admin-content">
+    <!-- Add Problem Statement Section -->
+    <div class="section-container">
+      <div class="section-header">
+        <h2>📄 Problem Statements</h2>
+        <button onclick="toggleAddStatementForm()" class="btn-primary">+ Add Problem Statement</button>
+      </div>
+
+      <!-- Add Statement Form -->
+      <div id="addStatementForm" class="form-box" style="display:none;">
+        <h3>Add New Problem Statement</h3>
+        
+        <input type="text" id="statementTitle" placeholder="Problem Title" class="form-input">
+        <input type="number" id="statementMaxTeams" placeholder="Max Teams/Limit" min="1" max="100" class="form-input">
+        
+        <div class="form-buttons">
+          <button onclick="addNewStatement()" class="btn-success">Add Statement</button>
+          <button onclick="toggleAddStatementForm()" class="btn-secondary">Cancel</button>
+        </div>
+      </div>
+
+      <!-- Statements List -->
+      <div id="statementsList" class="statements-list">
+        <p class="loading">Loading statements...</p>
+      </div>
+    </div>
+
+    <!-- Submissions Section -->
+    <div class="section-container" style="margin-top: 50px;">
+      <div class="section-header">
+        <h2>📊 Team Submissions</h2>
+        <button onclick="refreshSubmissions()" class="btn-secondary">🔄 Refresh</button>
+      </div>
+
+      <div id="submissionsList" class="submissions-table-container">
+        <p class="loading">Loading submissions...</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Delete Confirmation Modal -->
+<div id="deleteModal" class="modal" style="display:none;">
+  <div class="modal-content modal-small">
+    <h2>⚠️ Delete Statement?</h2>
+    <p id="deleteMessage"></p>
+    <p class="warning-text">This will also delete all team submissions for this statement.</p>
+    
+    <div class="form-buttons">
+      <button onclick="confirmDelete()" class="btn-danger">Delete Statement</button>
+      <button onclick="closeDeleteModal()" class="btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Edit Statement Modal -->
+<div id="editModal" class="modal" style="display:none;">
+  <div class="modal-content modal-small">
+    <h2>✏️ Edit Problem Statement</h2>
+    
+    <div style="margin: 20px 0;">
+      <label class="form-label">Problem Title:</label>
+      <input type="text" id="editStatementTitle" placeholder="Enter problem title" class="form-input">
+      
+      <label class="form-label" style="margin-top: 15px;">Max Teams/Limit:</label>
+      <input type="number" id="editStatementMaxTeams" placeholder="Enter max teams" min="1" max="100" class="form-input">
+    </div>
+    
+    <div class="form-buttons">
+      <button onclick="confirmEdit()" class="btn-success">Save Changes</button>
+      <button onclick="closeEditModal()" class="btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Change Password Modal -->
+<div id="changePasswordModal" class="modal" style="display:none;">
+  <div class="modal-content modal-small">
+    <h2>🔐 Change Password</h2>
+    
+    <div style="margin: 20px 0;">
+      <label class="form-label">Current Password:</label>
+      <input type="password" id="currentPassword" placeholder="Enter current password" class="form-input">
+      
+      <label class="form-label" style="margin-top: 15px;">New Password:</label>
+      <input type="password" id="newPassword" placeholder="Enter new password" class="form-input">
+      
+      <label class="form-label" style="margin-top: 15px;">Confirm Password:</label>
+      <input type="password" id="confirmPassword" placeholder="Confirm new password" class="form-input">
+      
+      <p id="passwordMessage" style="margin-top: 10px; color: red; display: none;"></p>
+    </div>
+    
+    <div class="form-buttons">
+      <button onclick="confirmPasswordChange()" class="btn-success">Update Password</button>
+      <button onclick="closeChangePasswordModal()" class="btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/admin.js"></script>
+</body>
+</html>

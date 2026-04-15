@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StartInno - Hackathon Platform</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<header class="header">
+  <div class="header-content">
+    <a href="admin.html" class="admin-link" title="Admin Panel">⚙️ Admin</a>
+    <h1 class="logo">🚀 StartInno Hackathon</h1>
+    <p class="tagline">Select a problem and submit your team</p>
+    <div class="header-buttons">
+      <button onclick="viewUploadedFiles()" class="view-files-btn" title="View uploaded files">👁️ View Files</button>
+    </div>
+  </div>
+</header>
+
+<main class="main-content">
+  <div class="instructions">
+    <h2>📋 How to Participate</h2>
+    <ol>
+      <li>View the problem statements below</li>
+      <li>Click the round circle to select the problem you want to work on</li>
+      <li>Enter your team name when prompted</li>
+      <li>Click "Submit Team" to register</li>
+      <li>Each team can only submit once per problem</li>
+    </ol>
+  </div>
+
+  <!-- Problems List Section -->
+  <div id="problems" class="problems-container"></div>
+</main>
+
+<footer class="footer">
+  <p>🏆 StartInno Hackathon Management Platform</p>
+  <p>Made with ❤️ for developers</p>
+</footer>
+
+<!-- Problem Statement Details Modal -->
+<div id="statementDetailsModal" class="modal" style="display:none;">
+  <div class="modal-content modal-large">
+    <div class="modal-header">
+      <h2>📄 Problem Statement Details</h2>
+      <div class="modal-header-buttons">
+        <button onclick="closeStatementDetailsModal()" class="btn-back">↩️ Cancel</button>
+        <button onclick="closeStatementDetailsModal()" class="close-btn">&times;</button>
+      </div>
+    </div>
+    
+    <div id="statementDetailsContent" class="statement-details-content">
+      <p class="loading">Loading statement...</p>
+    </div>
+    
+    <div id="stickyFooterBtn" class="sticky-footer-btn" style="display:none;">
+      <button onclick="closeStatementDetailsModal()" class="btn-cancel-large">↩️ Cancel & Go Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Team Name Modal -->
+<div id="teamNameModal" class="modal" style="display:none;">
+  <div class="modal-content modal-small">
+    <div class="modal-header">
+      <h2>👥 Enter Your Team Name</h2>
+      <button onclick="closeTeamNameModal()" class="close-btn">&times;</button>
+    </div>
+    
+    <input 
+      type="text" 
+      id="teamNameInput" 
+      placeholder="Enter your team name" 
+      class="form-input"
+      onkeyup="event.key === 'Enter' && confirmTeamName()"
+    >
+    
+    <div class="form-buttons">
+      <button onclick="confirmTeamName()" class="btn-success">Confirm</button>
+      <button onclick="closeTeamNameModal()" class="btn-secondary">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- View Uploaded Files Modal -->
+<div id="viewFilesModal" class="modal" style="display:none;">
+  <div class="modal-content modal-large">
+    <div class="modal-header">
+      <h2>📁 Uploaded Files</h2>
+      <div class="modal-header-buttons">
+        <button onclick="goBackFromViewFiles()" class="btn-back">← Back</button>
+        <button onclick="closeViewFilesModal()" class="close-btn">&times;</button>
+      </div>
+    </div>
+    
+    <div id="uploadedFilesContent" class="uploaded-files-content">
+      <p class="loading">Loading files...</p>
+    </div>
+    
+    <div id="viewFilesFooterBtn" class="sticky-footer-btn" style="display:none;">
+      <button onclick="closeViewFilesModal()" class="btn-cancel-large">← Close & Go Back</button>
+    </div>
+  </div>
+</div>
+
+<script src="js/main.js"></script>
+</body>
+</html>
