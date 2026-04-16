@@ -4,16 +4,35 @@ let authToken = null;
 let participantUsername = null;
 let currentRole = "participant"; // Default role
 const INVALID_LOGIN_MESSAGE = "Invalid credentials";
+
+const PARTICIPANT_SELECTION_SCOPE_KEY = "participantSelectionScope";
+let participantSelectionScope = null;
+
+function setParticipantSelectionScope(scope) {
+  participantSelectionScope = scope || null;
+
+  if (participantSelectionScope) {
+    localStorage.setItem(PARTICIPANT_SELECTION_SCOPE_KEY, participantSelectionScope);
+  } else {
+    localStorage.removeItem(PARTICIPANT_SELECTION_SCOPE_KEY);
+  }
+}
+
+function buildParticipantSelectionScope(username, password) {
+  return btoa(`${String(username || "guest")}:${String(password || "")}`);
+}
 const CREDENTIALS_RESET_VERSION_KEY = "credentialsResetVersion";
 let credentialsResetVersion = "1";
 
 
 function getSubmittedProblemStorageKeyForUsername(username) {
-  return `submittedProblemId_${username || "guest"}_v${credentialsResetVersion}`;
+  const scope = participantSelectionScope || localStorage.getItem(PARTICIPANT_SELECTION_SCOPE_KEY);
+  return `submittedProblemId_${scope || username || "guest"}_v${credentialsResetVersion}`;
 }
 
 function getSubmittedTeamStorageKeyForUsername(username) {
-  return `submittedTeamName_${username || "guest"}_v${credentialsResetVersion}`;
+  const scope = participantSelectionScope || localStorage.getItem(PARTICIPANT_SELECTION_SCOPE_KEY);
+  return `submittedTeamName_${scope || username || "guest"}_v${credentialsResetVersion}`;
 }
 
 function clearParticipantSessionStorage(options = {}) {
@@ -29,6 +48,7 @@ function clearParticipantSessionStorage(options = {}) {
     localStorage.removeItem(getSubmittedTeamStorageKeyForUsername(activeUsername));
     localStorage.removeItem(CREDENTIALS_RESET_VERSION_KEY);
     credentialsResetVersion = "1";
+    setParticipantSelectionScope(null);
   }
 
   localStorage.removeItem("userRole");
@@ -98,6 +118,12 @@ async function ensureActiveParticipantSession() {
     authToken = validation.data.token;
     participantUsername = validation.data.username;
     credentialsResetVersion = String(validation.data.credentialsResetVersion || localStorage.getItem(CREDENTIALS_RESET_VERSION_KEY) || "1");
+
+    const decoded = decodeSessionToken(authToken);
+    if (decoded && decoded.role === "participant") {
+      setParticipantSelectionScope(buildParticipantSelectionScope(decoded.identifier, decoded.password));
+    }
+
     localStorage.setItem(CREDENTIALS_RESET_VERSION_KEY, credentialsResetVersion);
     localStorage.setItem("authToken", authToken);
     localStorage.setItem("participantUsername", participantUsername);
@@ -149,6 +175,7 @@ async function participantLoginFromHome(triggerEvent) {
 
     authToken = data.token;
     participantUsername = data.username;
+    setParticipantSelectionScope(buildParticipantSelectionScope(username, password));
 
     localStorage.setItem(CREDENTIALS_RESET_VERSION_KEY, credentialsResetVersion);
     localStorage.setItem("authToken", authToken);
@@ -289,14 +316,12 @@ function participantLogout() {
   authToken = null;
   currentRole = "participant";
   clearInterval(autoRefreshInterval);
-  autoRefreshInterval = null;
   participantUsername = null;
 
   // Show login form
   showParticipantLogin();
   hideMainContent();
-  
-  // Clear form values
+
   document.getElementById("participantUsername").value = "";
   document.getElementById("participantPassword").value = "";
   document.getElementById("adminEmail").value = "";
@@ -351,6 +376,11 @@ window.addEventListener("DOMContentLoaded", async function() {
   const adminPasswordInput = document.getElementById("adminPassword");
   const attendanceRoomBtn = document.getElementById("attendanceRoomBtn");
 
+  const persistedScope = localStorage.getItem(PARTICIPANT_SELECTION_SCOPE_KEY);
+  if (persistedScope) {
+    participantSelectionScope = persistedScope;
+  }
+
   if (attendanceRoomBtn) {
     attendanceRoomBtn.style.display = "none";
   }
@@ -392,6 +422,11 @@ window.addEventListener("DOMContentLoaded", async function() {
       authToken = validation.data.token;
       participantUsername = validation.data.username;
       credentialsResetVersion = String(validation.data.credentialsResetVersion || localStorage.getItem(CREDENTIALS_RESET_VERSION_KEY) || "1");
+
+      const decoded = decodeSessionToken(authToken);
+      if (decoded && decoded.role === "participant") {
+        setParticipantSelectionScope(buildParticipantSelectionScope(decoded.identifier, decoded.password));
+      }
 
       localStorage.setItem(CREDENTIALS_RESET_VERSION_KEY, credentialsResetVersion);
       localStorage.setItem("authToken", authToken);
