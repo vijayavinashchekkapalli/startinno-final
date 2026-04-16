@@ -29,6 +29,134 @@
   margin-bottom: 25px;
 }
 
+/* ==================== ROLE SELECTION ==================== */
+
+.role-selection {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+}
+
+.role-btn {
+  flex: 1;
+  padding: 12px;
+  border: 2px solid #ddd;
+  background: white;
+  color: #333;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95em;
+  transition: all 0.3s ease;
+}
+
+/* Participant Role - Green */
+.role-btn.role-participant {
+  border-color: #22c55e;
+  color: #22c55e;
+}
+
+.role-btn.role-participant.active {
+  background: #22c55e;
+  color: white;
+  box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3);
+}
+
+.role-btn.role-participant:hover:not(.active) {
+  border-color: #16a34a;
+  color: #16a34a;
+}
+
+/* Admin Role - Blue/Purple */
+.role-btn.role-admin {
+  border-color: #667eea;
+  color: #667eea;
+}
+
+.role-btn.role-admin.active {
+  background: #667eea;
+  color: white;
+  box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+}
+
+.role-btn.role-admin:hover:not(.active) {
+  border-color: #5568d3;
+  color: #5568d3;
+}
+
+/* ==================== LOGIN FORMS ==================== */
+
+.login-form {
+  display: none;
+}
+
+.login-form.active {
+  display: block;
+}
+
+.login-form input {
+  width: 100%;
+  padding: 12px;
+  margin-bottom: 15px;
+  border: 1px solid #ddd;
+  border-radius: 5px;
+  font-size: 1em;
+}
+
+.login-form input:focus {
+  outline: none;
+  border-color: #667eea;
+  box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+}
+
+.login-form button {
+  width: 100%;
+  padding: 12px;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  font-size: 1em;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+/* Participant Login Button - Green */
+.btn-participant {
+  background: linear-gradient(135deg, #22c55e, #16a34a);
+}
+
+.btn-participant:hover {
+  transform: scale(1.02);
+  box-shadow: 0 5px 20px rgba(34, 197, 94, 0.4);
+}
+
+/* Admin Login Button - Blue/Purple */
+.btn-admin {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.btn-admin:hover {
+  transform: scale(1.02);
+  box-shadow: 0 5px 20px rgba(102, 126, 234, 0.4);
+}
+
+/* ==================== LOGIN ERROR MESSAGE ==================== */
+
+.login-error {
+  background: #fee;
+  color: #c33;
+  padding: 12px;
+  border-radius: 5px;
+  margin-top: 15px;
+  border-left: 4px solid #c33;
+  display: none;
+}
+
+.login-error.show {
+  display: block;
+}
+
 .login-box input {
   width: 100%;
   padding: 12px;
@@ -42,6 +170,22 @@
   outline: none;
   border-color: #667eea;
   box-shadow: 0 0 5px rgba(102, 126, 234, 0.3);
+}
+
+.login-box .form-input {
+  background: #ffffff;
+  color: #1f2937;
+  border: 1px solid #d1d5db;
+}
+
+.login-box .form-input::placeholder {
+  color: #6b7280;
+}
+
+.login-box .form-input:focus {
+  background: #ffffff;
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15);
 }
 
 .login-box button {
@@ -187,6 +331,27 @@
   box-shadow: 0 5px 15px rgba(244, 67, 54, 0.4);
 }
 
+.btn-reset-login {
+  background: linear-gradient(135deg, #0ea5e9, #0284c7);
+  color: white;
+  padding: 10px 18px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-weight: 600;
+  transition: all 0.3s ease;
+  white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.95em;
+}
+
+.btn-reset-login:hover {
+  transform: scale(1.05);
+  box-shadow: 0 5px 15px rgba(14, 165, 233, 0.4);
+}
+
 .btn-delete-file {
   background: linear-gradient(135deg, #ff9800, #f57c00);
   color: white;
@@ -290,6 +455,7 @@
   align-items: center;
   gap: 20px;
   transition: all 0.3s ease;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
@@ -381,6 +547,7 @@
   border-radius: 10px;
   padding: 25px;
   margin-bottom: 25px;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
 }
 
@@ -540,6 +707,7 @@
   border: 1px solid rgba(102, 126, 234, 0.3);
   border-radius: 10px;
   overflow: hidden;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
 }
@@ -634,6 +802,7 @@
   border: 1px solid rgba(76, 175, 80, 0.3);
   border-radius: 10px;
   overflow: hidden;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   transition: all 0.3s ease;
   padding: 20px;
@@ -692,6 +861,7 @@
   border: 1px solid rgba(102, 126, 234, 0.3);
   border-radius: 10px;
   overflow: auto;
+  -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   padding: 0;
 }
@@ -799,6 +969,95 @@
 .submission-info {
   margin-top: 15px;
   padding: 0;
+}
+
+/* ==================== DASHBOARD BREAKDOWN ==================== */
+
+.selection-breakdown-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.selection-card {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(102, 126, 234, 0.25);
+  border-radius: 10px;
+  padding: 18px;
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+
+.selection-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.selection-card-header h3 {
+  margin: 0;
+  color: white;
+  font-size: 1.05em;
+}
+
+.selection-count {
+  background: rgba(76, 175, 80, 0.2);
+  border: 1px solid rgba(76, 175, 80, 0.4);
+  color: #84f3a0;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 0.85em;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.selection-label {
+  margin: 0 0 10px 0;
+  color: #b0b0b0;
+  font-size: 0.92em;
+  font-weight: 600;
+}
+
+.team-names-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #e8e8e8;
+}
+
+.team-names-list li {
+  margin: 6px 0;
+}
+
+.no-teams-text {
+  margin: 0;
+  color: #9a9a9a;
+  font-style: italic;
+}
+
+/* ==================== SUBMISSION ACTIONS ==================== */
+
+.submissions-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.btn-download-report {
+  background: linear-gradient(135deg, #00b894, #00a383);
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 10px 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.btn-download-report:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 16px rgba(0, 184, 148, 0.35);
 }
 
 /* ==================== MODALS ==================== */

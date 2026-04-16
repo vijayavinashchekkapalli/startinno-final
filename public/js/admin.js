@@ -1,16 +1,440 @@
 let authToken = null;
 let adminEmail = null;
+let participantUsername = null;
+let currentRole = "participant"; // Default role
 let problemToDelete = null;
 let problemToEdit = null;
+let adminProblemsCache = [];
+let adminSubmissionsCache = [];
+const INVALID_LOGIN_MESSAGE = "Invalid credentials";
 
-// ==================== AUTHENTICATION ====================
+function clearAdminSessionStorage() {
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("adminEmail");
+  localStorage.removeItem("userRole");
+}
+
+function decodeSessionToken(token) {
+  try {
+    const decoded = atob(token || "");
+    const parts = decoded.split(":");
+
+    if (parts.length < 3) {
+      return null;
+    }
+
+    return {
+      identifier: parts[0],
+      password: parts[1],
+      role: parts[2]
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function validateStoredAdminSession(savedToken) {
+  const decoded = decodeSessionToken(savedToken);
+
+  if (!decoded || decoded.role !== "admin") {
+    return { valid: false };
+  }
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email: decoded.identifier,
+        password: decoded.password,
+        role: "admin"
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { valid: false };
+    }
+
+    return { valid: true, data };
+  } catch (error) {
+    return { valid: false };
+  }
+}
+
+function escapeHtml(value) {
+  return String(value || "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function getSubmissionProblemId(submission) {
+  if (submission.problemId) {
+    return String(submission.problemId);
+  }
+
+  if (submission.problem && submission.problem[0] && submission.problem[0]._id) {
+    return String(submission.problem[0]._id);
+  }
+
+  return null;
+}
+
+function formatSubmissionDate(dateValue) {
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) {
+    return "N/A";
+  }
+
+  return date.toLocaleString("en-US", {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  });
+}
+
+function renderDashboard() {
+  const statsContainer = document.getElementById("dashboardStats");
+  const breakdownContainer = document.getElementById("problemSelectionBreakdown");
+
+  if (!statsContainer || !breakdownContainer) {
+    return;
+  }
+
+  const problems = Array.isArray(adminProblemsCache) ? adminProblemsCache : [];
+  const submissions = Array.isArray(adminSubmissionsCache) ? adminSubmissionsCache : [];
+
+  const totalProblems = problems.length;
+  const totalTeamLimit = problems.reduce((sum, problem) => sum + (Number(problem.maxTeams) || 0), 0);
+  const submittedTeams = new Set(
+    submissions
+      .map((submission) => String(submission.teamName || "").trim())
+      .filter(Boolean)
+  ).size;
+  const teamsYetToSubmit = Math.max(totalTeamLimit - submittedTeams, 0);
+
+  statsContainer.innerHTML = `
+    <div class="stat-card">
+      <div class="stat-icon">📄</div>
+      <div class="stat-content">
+        <p class="stat-label">Total Problems</p>
+        <p class="stat-value">${totalProblems}</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">👥</div>
+      <div class="stat-content">
+        <p class="stat-label">Total Team Limit</p>
+        <p class="stat-value">${totalTeamLimit}</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">✅</div>
+      <div class="stat-content">
+        <p class="stat-label">Teams Submitted</p>
+        <p class="stat-value">${submittedTeams}</p>
+      </div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-icon">⏳</div>
+      <div class="stat-content">
+        <p class="stat-label">Teams Yet To Submit</p>
+        <p class="stat-value">${teamsYetToSubmit}</p>
+      </div>
+    </div>
+  `;
+
+  if (problems.length === 0) {
+    breakdownContainer.innerHTML = '<p class="empty-message">No problem statements available yet.</p>';
+    return;
+  }
+
+  const cardsHtml = problems.map((problem) => {
+    const problemId = String(problem._id);
+    const teamNames = submissions
+      .filter((submission) => getSubmissionProblemId(submission) === problemId)
+      .map((submission) => submission.teamName)
+      .filter(Boolean);
+
+    const teamsHtml = teamNames.length > 0
+      ? `<ul class="team-names-list">${teamNames.map((name) => `<li>${escapeHtml(name)}</li>`).join("")}</ul>`
+      : '<p class="no-teams-text">No teams selected yet.</p>';
+
+    return `
+      <div class="selection-card">
+        <div class="selection-card-header">
+          <h3>${escapeHtml(problem.title || "Untitled Problem")}</h3>
+          <span class="selection-count">${Number(problem.selectedTeams) || 0} / ${Number(problem.maxTeams) || 0}</span>
+        </div>
+        <div class="selection-card-body">
+          <p class="selection-label">Selected Team Names</p>
+          ${teamsHtml}
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  breakdownContainer.innerHTML = cardsHtml;
+}
+
+async function downloadSubmissionReport() {
+  console.log("⬇️ [Admin] Generating submission report...");
+
+  try {
+    const [problemsRes, submissionsRes] = await Promise.all([
+      fetch("/api/getProblems?t=" + Date.now()),
+      fetch("/api/getsubmission?t=" + Date.now())
+    ]);
+
+    if (!problemsRes.ok) {
+      throw new Error(`Failed to fetch problems (HTTP ${problemsRes.status})`);
+    }
+
+    if (!submissionsRes.ok) {
+      throw new Error(`Failed to fetch submissions (HTTP ${submissionsRes.status})`);
+    }
+
+    const problems = await problemsRes.json();
+    const submissions = await submissionsRes.json();
+
+    const generatedAt = new Date().toLocaleString("en-US", {
+      year: "numeric",
+      month: "long",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit"
+    });
+
+    const submittedTeamCount = submissions.filter((submission) => {
+      const teamName = String(submission.teamName || "").trim();
+      return teamName.length > 0;
+    }).length;
+
+    const problemLookup = new Map(problems.map((problem) => [String(problem._id), problem]));
+
+    const groupedSubmissions = submissions.reduce((groups, submission) => {
+      const teamName = String(submission.teamName || "").trim();
+
+      if (!teamName) {
+        return groups;
+      }
+
+      const problemId = getSubmissionProblemId(submission);
+      const matchedProblem = problemId ? problemLookup.get(problemId) : null;
+      const problemTitle = matchedProblem?.title || submission.problem?.[0]?.title || "Untitled Problem";
+      const groupKey = problemTitle.toLowerCase();
+
+      if (!groups.has(groupKey)) {
+        groups.set(groupKey, {
+          title: problemTitle,
+          teams: []
+        });
+      }
+
+      groups.get(groupKey).teams.push(teamName);
+      return groups;
+    }, new Map());
+
+    const sortedProblemGroups = Array.from(groupedSubmissions.values())
+      .map((group) => ({
+        title: group.title,
+        teams: group.teams.sort((left, right) => left.localeCompare(right))
+      }))
+      .sort((left, right) => left.title.localeCompare(right.title));
+
+    const submissionSections = sortedProblemGroups.map((group) => {
+      const teamRows = group.teams.map((teamName, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(teamName)}</td>
+        </tr>
+      `).join("");
+
+      return `
+        <h2>${escapeHtml(group.title)}</h2>
+        <p><strong>Selected Teams:</strong> ${group.teams.length}</p>
+        <table>
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Team Name</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${teamRows}
+          </tbody>
+        </table>
+      `;
+    }).join("<hr />");
+
+    const reportHtml = `
+      <html>
+        <head>
+          <meta charset="UTF-8" />
+          <title>StartInno Submissions Report</title>
+          <style>
+            body { font-family: Arial, sans-serif; padding: 24px; color: #222; }
+            h1 { margin-bottom: 4px; }
+            h2 { margin-top: 28px; margin-bottom: 8px; }
+            p { margin: 4px 0; }
+            table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 18px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f3f4f6; }
+            hr { border: none; border-top: 1px solid #ddd; margin: 26px 0; }
+          </style>
+        </head>
+        <body>
+          <h1>StartInno Hackathon - Submission Report</h1>
+          <p><strong>Generated At:</strong> ${escapeHtml(generatedAt)}</p>
+          <p><strong>Total Problems:</strong> ${problems.length}</p>
+          <p><strong>Submitted Teams:</strong> ${submittedTeamCount}</p>
+          <hr />
+          ${submissionSections || "<p>No teams have submitted yet.</p>"}
+        </body>
+      </html>
+    `;
+
+    const blob = new Blob([reportHtml], { type: "application/msword" });
+    const reportUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+
+    link.href = reportUrl;
+    link.download = `startinno-submissions-report-${timestamp}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(reportUrl);
+
+    console.log("✅ [Admin] Submission report downloaded");
+  } catch (error) {
+    console.error("❌ [Admin] Report generation failed:", error);
+    alert("Failed to download report: " + error.message);
+  }
+}
+
+// ==================== ROLE SELECTION ====================
+
+function selectRole(role) {
+  currentRole = role;
+  
+  // Update role button styles
+  const participantBtn = document.getElementById("participantRoleBtn");
+  const adminBtn = document.getElementById("adminRoleBtn");
+  
+  const participantForm = document.getElementById("participantLoginForm");
+  const adminForm = document.getElementById("adminLoginForm");
+  
+  if (role === "participant") {
+    participantBtn.classList.add("active");
+    adminBtn.classList.remove("active");
+    participantForm.classList.add("active");
+    participantForm.style.display = "block";
+    adminForm.classList.remove("active");
+    adminForm.style.display = "none";
+  } else {
+    participantBtn.classList.remove("active");
+    adminBtn.classList.add("active");
+    participantForm.classList.remove("active");
+    participantForm.style.display = "none";
+    adminForm.classList.add("active");
+    adminForm.style.display = "block";
+  }
+  
+  // Clear error message
+  hideLoginError();
+  
+  // Clear previous form values
+  document.getElementById("participantUsername").value = "";
+  document.getElementById("participantPassword").value = "";
+  document.getElementById("adminEmail").value = "";
+  document.getElementById("adminPassword").value = "";
+  
+  console.log(`✅ [Auth] Switched to ${role} login`);
+}
+
+function showLoginError(message) {
+  const errorDiv = document.getElementById("loginError");
+  errorDiv.textContent = message;
+  errorDiv.classList.add("show");
+}
+
+function hideLoginError() {
+  const errorDiv = document.getElementById("loginError");
+  errorDiv.classList.remove("show");
+}
+
+function handleLoginKeyPress(event) {
+  if (event.key === "Enter") {
+    if (currentRole === "participant") {
+      participantLogin();
+    } else {
+      adminLogin();
+    }
+  }
+}
+
+// ==================== PARTICIPANT LOGIN ====================
+
+async function participantLogin() {
+  const username = document.getElementById("participantUsername").value.trim();
+  const password = document.getElementById("participantPassword").value.trim();
+
+  if (!username || !password) {
+    showLoginError("Please enter username and password");
+    return;
+  }
+
+  console.log("🔐 [Participant] Attempting login...");
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, role: "participant" })
+    });
+
+    const data = await res.json();
+    console.log("📊 [Participant] Login response:", data);
+
+    if (res.ok && data.success) {
+      console.log("✅ [Participant] Login successful");
+      authToken = data.token;
+      participantUsername = data.username;
+      currentRole = "participant";
+
+      // Save to localStorage
+      localStorage.setItem("authToken", authToken);
+      localStorage.setItem("participantUsername", participantUsername);
+      localStorage.setItem("userRole", "participant");
+
+      // Redirect to user home page
+      window.location.href = "/index.html";
+    } else {
+      console.warn("❌ [Participant] Login failed:", data.message);
+      showLoginError(INVALID_LOGIN_MESSAGE);
+    }
+  } catch (error) {
+    console.error("❌ [Participant] Login error:", error);
+    showLoginError(INVALID_LOGIN_MESSAGE);
+  }
+}
+
+// ==================== ADMIN LOGIN ====================
 
 async function adminLogin() {
-  const email = document.getElementById("loginEmail").value.trim();
-  const password = document.getElementById("loginPassword").value.trim();
+  const email = document.getElementById("adminEmail").value.trim();
+  const password = document.getElementById("adminPassword").value.trim();
 
   if (!email || !password) {
-    alert("Please enter email and password");
+    showLoginError("Please enter email and password");
     return;
   }
 
@@ -20,72 +444,93 @@ async function adminLogin() {
     const res = await fetch("/api/login", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, password })
+      body: JSON.stringify({ email, password, role: "admin" })
     });
 
     const data = await res.json();
     console.log("📊 [Admin] Login response:", data);
 
-    if (data.success) {
+    if (res.ok && data.success) {
       console.log("✅ [Admin] Login successful");
       authToken = data.token;
       adminEmail = data.email;
+      currentRole = "admin";
 
       // Save to localStorage
-      localStorage.setItem("adminToken", authToken);
+      localStorage.setItem("authToken", authToken);
       localStorage.setItem("adminEmail", adminEmail);
+      localStorage.setItem("userRole", "admin");
+
+      hideLoginError();
 
       // Show admin panel
       document.getElementById("loginContainer").style.display = "none";
       document.getElementById("adminContainer").style.display = "block";
-      document.getElementById("adminEmail").textContent = adminEmail;
+      document.getElementById("adminEmailDisplay").textContent = adminEmail;
 
       // Load data
       loadStatements();
       loadSubmissions();
     } else {
-      console.warn("❌ [Admin] Login failed:");
-      alert(data.message || "Login failed");
+      console.warn("❌ [Admin] Login failed:", data.message);
+      clearAdminSessionStorage();
+      showLoginError(INVALID_LOGIN_MESSAGE);
     }
   } catch (error) {
     console.error("❌ [Admin] Login error:", error);
-    alert("Error: " + error.message);
+    clearAdminSessionStorage();
+    showLoginError(INVALID_LOGIN_MESSAGE);
   }
 }
+
+// ==================== LOGOUT ====================
 
 function adminLogout() {
   console.log("🚪 [Admin] Logging out...");
   authToken = null;
   adminEmail = null;
-  localStorage.removeItem("adminToken");
-  localStorage.removeItem("adminEmail");
+  currentRole = "participant";
+  clearAdminSessionStorage();
 
-  document.getElementById("loginContainer").style.display = "block";
-  document.getElementById("adminContainer").style.display = "none";
-  document.getElementById("loginEmail").value = "admin@startinno.com";
-  document.getElementById("loginPassword").value = "admin123";
+  // Always return to the main login page with StartInno logo background.
+  window.location.href = "/index.html";
 }
 
 // ==================== CHECK AUTH ON LOAD ====================
 
-window.onload = function() {
+window.addEventListener("DOMContentLoaded", async function() {
   console.log("✅ [Admin] Page loaded");
-  const savedToken = localStorage.getItem("adminToken");
+  const savedToken = localStorage.getItem("authToken");
+  const savedRole = localStorage.getItem("userRole");
   
-  if (savedToken) {
-    authToken = savedToken;
-    adminEmail = localStorage.getItem("adminEmail");
-    document.getElementById("loginContainer").style.display = "none";
-    document.getElementById("adminContainer").style.display = "block";
-    document.getElementById("adminEmail").textContent = adminEmail;
+  if (savedToken && savedRole === "admin") {
+    const validation = await validateStoredAdminSession(savedToken);
 
-    console.log("✅ [Admin] Restored session for:", adminEmail);
-    loadStatements();
-    loadSubmissions();
-  } else {
-    console.log("ℹ️ [Admin] No saved session");
+    if (validation.valid) {
+      authToken = validation.data.token;
+      adminEmail = validation.data.email || localStorage.getItem("adminEmail") || "";
+      currentRole = "admin";
+
+      localStorage.setItem("authToken", authToken);
+      localStorage.setItem("adminEmail", adminEmail);
+      localStorage.setItem("userRole", "admin");
+
+      document.getElementById("loginContainer").style.display = "none";
+      document.getElementById("adminContainer").style.display = "block";
+      document.getElementById("adminEmailDisplay").textContent = adminEmail;
+
+      console.log("✅ [Admin] Restored session for:", adminEmail);
+      loadStatements();
+      loadSubmissions();
+      return;
+    }
+
+    clearAdminSessionStorage();
   }
-};
+
+  // If admin session is not valid, redirect to normal login page.
+  window.location.href = "/index.html";
+});
 
 // ==================== STATEMENTS MANAGEMENT ====================
 
@@ -97,6 +542,7 @@ async function loadStatements() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const problems = await res.json();
+    adminProblemsCache = Array.isArray(problems) ? problems : [];
     console.log("✅ [Admin] Loaded statements:", problems);
 
     const container = document.getElementById("statementsList");
@@ -104,8 +550,11 @@ async function loadStatements() {
 
     if (!Array.isArray(problems) || problems.length === 0) {
       container.innerHTML = '<p class="empty-message">No problem statements added yet. Click "Add Problem Statement" to create one.</p>';
+      renderDashboard();
       return;
     }
+
+    renderDashboard();
 
     problems.forEach(statement => {
       const card = document.createElement("div");
@@ -121,7 +570,7 @@ async function loadStatements() {
         </div>
         
         <div class="statement-actions">
-          <button onclick="openEditModal('${statement._id}', '${statement.title.replace(/'/g, "\\'")}}', ${statement.maxTeams})" class="btn-warning">✏️ Edit</button>
+          <button onclick="openEditModal('${statement._id}', '${statement.title.replace(/'/g, "\\'")}', ${statement.maxTeams})" class="btn-warning">✏️ Edit</button>
           <button onclick="deleteStatement('${statement._id}', '${statement.title.replace(/'/g, "\\'")}')" class="btn-danger">🗑️ Delete</button>
         </div>
       `;
@@ -132,6 +581,8 @@ async function loadStatements() {
   } catch (error) {
     console.error("❌ [Admin] Error loading statements:", error);
     document.getElementById("statementsList").innerHTML = `<p class="error-message">Error loading statements: ${error.message}</p>`;
+    adminProblemsCache = [];
+    renderDashboard();
   }
 }
 
@@ -206,6 +657,7 @@ async function loadSubmissions() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
     const submissions = await res.json();
+    adminSubmissionsCache = Array.isArray(submissions) ? submissions : [];
     console.log("✅ [Admin] Loaded submissions:", submissions);
 
     const container = document.getElementById("submissionsList");
@@ -213,6 +665,7 @@ async function loadSubmissions() {
 
     if (!Array.isArray(submissions) || submissions.length === 0) {
       container.innerHTML = '<p class="empty-message">📭 No team submissions yet.</p>';
+      renderDashboard();
       return;
     }
 
@@ -269,10 +722,13 @@ async function loadSubmissions() {
     tableHTML += `</div>`;
 
     container.innerHTML = tableHTML;
+    renderDashboard();
 
   } catch (error) {
     console.error("❌ [Admin] Error loading submissions:", error);
     document.getElementById("submissionsList").innerHTML = `<p class="error-message">Error loading submissions: ${error.message}</p>`;
+    adminSubmissionsCache = [];
+    renderDashboard();
   }
 }
 
@@ -444,6 +900,34 @@ async function deleteAllTeamsAndSubmissions() {
   } catch (error) {
     console.error("❌ [Admin] Error:", error);
     alert("Error: " + error.message);
+  }
+}
+
+// ==================== RESET LOGIN CREDENTIAL MAPPINGS ====================
+
+async function resetLoginCredentials() {
+  const confirmed = confirm(
+    "⚠️ This will reset all existing login-credential mappings for participants.\n\nAfter this, users can login with the same credentials and they will see all problems again until they select/submit.\n\nDo you want to continue?"
+  );
+
+  if (!confirmed) {
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/resetLoginCredentials", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" }
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      throw new Error(data.message || "Failed to reset login credentials");
+    }
+
+    alert("✅ Login credentials reset applied successfully.");
+  } catch (error) {
+    alert("❌ " + error.message);
   }
 }
 

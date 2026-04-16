@@ -8,18 +8,98 @@
 </head>
 <body>
 
-<header class="header">
+<!-- Participant Login Container -->
+<div id="participantLoginContainer" class="participant-login-container">
+  <div class="participant-login-box">
+    <h1>� StartInno Login</h1>
+    <p class="subtitle">Hackathon Platform</p>
+    
+    <!-- Role Selection -->
+    <div class="role-selection">
+      <button 
+        id="participantRoleBtn" 
+        class="role-btn role-participant active" 
+        onclick="selectRole('participant')"
+        title="Participant Login"
+      >
+        👤 Participant
+      </button>
+      <button 
+        id="adminRoleBtn" 
+        class="role-btn role-admin" 
+        onclick="selectRole('admin')"
+        title="Admin Login"
+      >
+        👨‍💼 Admin
+      </button>
+    </div>
+
+    <!-- Participant Login Form -->
+    <div id="participantLoginForm" class="login-form active">
+      <input 
+        type="text" 
+        id="participantUsername" 
+        placeholder="Username" 
+        class="form-input"
+      >
+      <input 
+        type="password" 
+        id="participantPassword" 
+        placeholder="Password" 
+        class="form-input"
+      >
+       <button id="participantLoginBtn" type="button" class="btn-primary btn-participant">Login as Participant</button>
+    </div>
+
+    <!-- Admin Confirmation Step -->
+    <div id="adminConfirmation" class="login-form" style="display:none;">
+      <div class="confirmation-message">
+        <h3>🔐 Admin Login</h3>
+        <p>You are about to access the admin panel.</p>
+        <p>Only authorized administrators should proceed.</p>
+      </div>
+      <button onclick="proceedToAdminLogin()" class="btn-primary btn-admin">Continue as Admin</button>
+      <button onclick="selectRole('participant')" class="btn-secondary">Cancel</button>
+    </div>
+
+    <!-- Admin Login Form -->
+    <div id="adminLoginForm" class="login-form" style="display:none;">
+      <input 
+        type="email" 
+        id="adminEmail" 
+        placeholder="Email" 
+        class="form-input"
+      >
+      <input 
+        type="password" 
+        id="adminPassword" 
+        placeholder="Password" 
+        class="form-input"
+      >
+       <button id="adminLoginBtn" type="button" class="btn-primary btn-admin">Login as Admin</button>
+      <button onclick="goBackToRoleSelection()" class="btn-secondary">Back</button>
+    </div>
+
+    <div id="participantLoginError" class="login-error" style="display:none;"></div>
+    
+  </div>
+</div>
+
+<header class="header" id="mainHeader" style="display:none;">
   <div class="header-content">
-    <a href="admin.html" class="admin-link" title="Admin Panel">⚙️ Admin</a>
+    <div class="header-left-actions">
+      <button onclick="viewUploadedFiles()" class="view-files-btn" title="View uploaded files">👁️ View Files</button>
+      <button id="attendanceRoomBtn" onclick="openAttendanceRoom()" class="attendance-room-btn" title="Mark session attendance">📸 Attendance Room</button>
+    </div>
     <h1 class="logo">🚀 StartInno Hackathon</h1>
     <p class="tagline">Select a problem and submit your team</p>
     <div class="header-buttons">
-      <button onclick="viewUploadedFiles()" class="view-files-btn" title="View uploaded files">👁️ View Files</button>
+      <button onclick="participantLogout()" class="logout-btn" title="Logout">🚪 Logout</button>
     </div>
   </div>
 </header>
 
-<main class="main-content">
+<main class="main-content" id="mainContent" style="display:none;">
   <div class="instructions">
     <h2>📋 How to Participate</h2>
     <ol>
@@ -101,6 +181,51 @@
     
     <div id="viewFilesFooterBtn" class="sticky-footer-btn" style="display:none;">
       <button onclick="closeViewFilesModal()" class="btn-cancel-large">← Close & Go Back</button>
+    </div>
+  </div>
+</div>
+
+<!-- Attendance Room Modal -->
+<div id="attendanceModal" class="modal" style="display:none;">
+  <div class="modal-content modal-small">
+    <div class="modal-header">
+      <h2>📸 Attendance Room</h2>
+      <button onclick="closeAttendanceRoom()" class="close-btn">&times;</button>
+    </div>
+
+    <p id="attendanceAccessMessage" class="attendance-access-message">Loading attendance access...</p>
+
+    <label class="form-label">Team Name</label>
+    <input type="text" id="attendanceTeamName" class="form-input" readonly>
+
+    <label class="form-label">Team Lead Name</label>
+    <input type="text" id="attendanceTeamLeadName" class="form-input" placeholder="Enter team lead name (required)">
+
+    <label class="form-label">Session</label>
+    <select id="attendanceSession" class="form-input"></select>
+
+    <p id="attendanceCurrentStep" class="attendance-current-step">Current step: Team Lead</p>
+
+    <label class="form-label" id="attendancePersonLabel">Member Name</label>
+    <input type="text" id="attendanceMemberName" class="form-input" placeholder="Enter member name">
+
+    <div class="attendance-camera-wrap">
+      <video id="attendanceVideo" autoplay playsinline muted class="attendance-video"></video>
+      <canvas id="attendanceCanvas" class="attendance-canvas" width="320" height="240"></canvas>
+      <img id="attendanceSnapshotPreview" class="attendance-snapshot" alt="Attendance snapshot preview" style="display:none;" />
+    </div>
+
+    <p id="attendanceLimitInfo" class="attendance-limit-info"></p>
+    <div id="attendanceMarkedList" class="attendance-marked-list"></div>
+
+    <div class="form-buttons">
+      <button type="button" onclick="startAttendanceCamera()" class="btn-secondary">Start Camera</button>
+      <button type="button" onclick="captureAttendancePhoto()" class="btn-secondary">Capture</button>
+    </div>
+
+    <div class="form-buttons">
+      <button type="button" onclick="submitAttendance()" class="btn-success">Submit Attendance</button>
+      <button type="button" onclick="closeAttendanceRoom()" class="btn-secondary">Close</button>
     </div>
   </div>
 </div>

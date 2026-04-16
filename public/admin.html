@@ -11,13 +11,68 @@
 
 <div id="loginContainer" class="login-container">
   <div class="login-box">
-    <h1>🔐 Admin Login</h1>
-    <p class="subtitle">StartInno Hackathon Platform</p>
+    <h1>🔐 StartInno Login</h1>
+    <p class="subtitle">Hackathon Platform</p>
     
-    <input type="email" id="loginEmail" placeholder="Email">
-    <input type="password" id="loginPassword" placeholder="Password">
-    
-    <button onclick="adminLogin()" class="btn-primary">Login</button>
+    <!-- Role Selection -->
+    <div class="role-selection">
+      <button 
+        id="participantRoleBtn" 
+        class="role-btn role-participant active" 
+        onclick="selectRole('participant')"
+        title="Participant Login"
+      >
+        👤 Participant
+      </button>
+      <button 
+        id="adminRoleBtn" 
+        class="role-btn role-admin" 
+        onclick="selectRole('admin')"
+        title="Admin Login"
+      >
+        👨‍💼 Admin
+      </button>
+    </div>
+
+    <!-- Participant Login Form -->
+    <div id="participantLoginForm" class="login-form active">
+      <input 
+        type="text" 
+        id="participantUsername" 
+        placeholder="Username" 
+        class="form-input"
+        onkeyup="handleLoginKeyPress(event)"
+      >
+      <input 
+        type="password" 
+        id="participantPassword" 
+        placeholder="Password" 
+        class="form-input"
+        onkeyup="handleLoginKeyPress(event)"
+      >
+      <button onclick="participantLogin()" class="btn-primary btn-participant">Login as Participant</button>
+    </div>
+
+    <!-- Admin Login Form -->
+    <div id="adminLoginForm" class="login-form">
+      <input 
+        type="email" 
+        id="adminEmail" 
+        placeholder="Email" 
+        class="form-input"
+        onkeyup="handleLoginKeyPress(event)"
+      >
+      <input 
+        type="password" 
+        id="adminPassword" 
+        placeholder="Password" 
+        class="form-input"
+        onkeyup="handleLoginKeyPress(event)"
+      >
+      <button onclick="adminLogin()" class="btn-primary btn-admin">Login as Admin</button>
+    </div>
+
+    <div id="loginError" class="login-error" style="display:none;"></div>
   </div>
 </div>
 
@@ -30,13 +85,59 @@
       <button onclick="uploadFromDriveLink()" class="btn-upload-drive" title="Upload file from drive link">☁️ Upload</button>
       <button onclick="deleteUploadedFile()" class="btn-delete-file" title="Delete uploaded file">🗑️ Delete File</button>
       <button onclick="deleteAllTeamsAndSubmissions()" class="btn-remove-all" title="Delete all teams and submissions">🗑️ Remove All</button>
+      <button onclick="resetLoginCredentials()" class="btn-reset-login" title="Reset all login credential mappings">🔄 Reset Login</button>
       <button onclick="openChangePasswordModal()" class="btn-change-pwd" title="Change admin password">🔑 Change Password</button>
-      <span id="adminEmail"></span>
+      <span id="adminEmailDisplay"></span>
       <button onclick="adminLogout()" class="btn-secondary">Logout</button>
     </div>
   </nav>
 
   <div class="admin-content">
+    <!-- Dashboard Section -->
+    <div class="section-container">
+      <div class="section-header">
+        <h2>📈 Dashboard</h2>
+      </div>
+
+      <div id="dashboardStats" class="dashboard-stats">
+        <div class="stat-card">
+          <div class="stat-icon">📄</div>
+          <div class="stat-content">
+            <p class="stat-label">Total Problems</p>
+            <p class="stat-value">0</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">👥</div>
+          <div class="stat-content">
+            <p class="stat-label">Total Team Limit</p>
+            <p class="stat-value">0</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">✅</div>
+          <div class="stat-content">
+            <p class="stat-label">Teams Submitted</p>
+            <p class="stat-value">0</p>
+          </div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-icon">⏳</div>
+          <div class="stat-content">
+            <p class="stat-label">Teams Yet To Submit</p>
+            <p class="stat-value">0</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="section-header" style="margin-top: 10px;">
+        <h2>👥 Problem-wise Team Selection</h2>
+      </div>
+      <div id="problemSelectionBreakdown" class="selection-breakdown-list">
+        <p class="loading">Loading dashboard...</p>
+      </div>
+    </div>
+
     <!-- Add Problem Statement Section -->
     <div class="section-container">
       <div class="section-header">
@@ -67,7 +168,10 @@
     <div class="section-container" style="margin-top: 50px;">
       <div class="section-header">
         <h2>📊 Team Submissions</h2>
-        <button onclick="refreshSubmissions()" class="btn-secondary">🔄 Refresh</button>
+        <div class="submissions-actions">
+          <button onclick="downloadSubmissionReport()" class="btn-download-report">⬇️ Download Report</button>
+          <button onclick="refreshSubmissions()" class="btn-secondary">🔄 Refresh</button>
+        </div>
       </div>
 
       <div id="submissionsList" class="submissions-table-container">

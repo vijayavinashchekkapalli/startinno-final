@@ -1,3 +1,438 @@
+// ==================== AUTHENTICATION ====================
+
+let authToken = null;
+let participantUsername = null;
+let currentRole = "participant"; // Default role
+const INVALID_LOGIN_MESSAGE = "Invalid credentials";
+const CREDENTIALS_RESET_VERSION_KEY = "credentialsResetVersion";
+let credentialsResetVersion = "1";
+
+
+function getSubmittedProblemStorageKeyForUsername(username) {
+  return `submittedProblemId_${username || "guest"}_v${credentialsResetVersion}`;
+}
+
+function getSubmittedTeamStorageKeyForUsername(username) {
+  return `submittedTeamName_${username || "guest"}_v${credentialsResetVersion}`;
+}
+
+function clearParticipantSessionStorage(options = {}) {
+  const { preserveSelection = false } = options;
+  const activeUsername = participantUsername || localStorage.getItem("participantUsername");
+
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("participantUsername");
+  localStorage.removeItem("participantUserId");
+
+  if (!preserveSelection) {
+    localStorage.removeItem(getSubmittedProblemStorageKeyForUsername(activeUsername));
+    localStorage.removeItem(getSubmittedTeamStorageKeyForUsername(activeUsername));
+    localStorage.removeItem(CREDENTIALS_RESET_VERSION_KEY);
+    credentialsResetVersion = "1";
+  }
+
+  localStorage.removeItem("userRole");
+}
+
+function clearAdminSessionStorage() {
+  localStorage.removeItem("authToken");
+  localStorage.removeItem("adminEmail");
+  localStorage.removeItem("userRole");
+}
+
+function decodeSessionToken(token) {
+  try {
+    const decoded = atob(token || "");
+    const parts = decoded.split(":");
+
+    if (parts.length < 3) {
+      return null;
+    }
+
+    return {
+      identifier: parts[0],
+      password: parts[1],
+      role: parts[2]
+    };
+  } catch (error) {
+    return null;
+  }
+}
+
+async function validateStoredSession(savedToken, savedRole) {
+  const decoded = decodeSessionToken(savedToken);
+
+  if (!decoded || decoded.role !== savedRole) {
+    return { valid: false };
+  }
+
+  const requestBody = savedRole === "participant"
+    ? { username: decoded.identifier, password: decoded.password, role: "participant" }
+    : { email: decoded.identifier, password: decoded.password, role: "admin" };
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(requestBody)
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success) {
+      return { valid: false };
+    }
+
+    return { valid: true, data };
+  } catch (error) {
+    return { valid: false };
+  }
+}
+
+async function ensureActiveParticipantSession() {
+  if (!authToken || !participantUsername) {
+    return false;
+  }
+
+  const validation = await validateStoredSession(authToken, "participant");
+  if (validation.valid) {
+    authToken = validation.data.token;
+    participantUsername = validation.data.username;
+    credentialsResetVersion = String(validation.data.credentialsResetVersion || localStorage.getItem(CREDENTIALS_RESET_VERSION_KEY) || "1");
+    localStorage.setItem(CREDENTIALS_RESET_VERSION_KEY, credentialsResetVersion);
+    localStorage.setItem("authToken", authToken);
+    localStorage.setItem("participantUsername", participantUsername);
+    localStorage.setItem("participantUserId", String(validation.data.userId || ""));
+    return true;
+  }
+
+  participantLogout();
+  showParticipantLoginError(INVALID_LOGIN_MESSAGE);
+  return false;
+}
+
+async function participantLoginFromHome(triggerEvent) {
+  const username = document.getElementById("participantUsername").value.trim();
+  const password = document.getElementById("participantPassword").value.trim();
+  const loginBtn = (triggerEvent && triggerEvent.target) || document.getElementById("participantLoginBtn");
+
+  if (!username || !password) {
+    showParticipantLoginError("Please enter username and password");
+    return;
+  }
+
+  if (loginBtn) {
+    loginBtn.disabled = true;
+    loginBtn.dataset.originalText = loginBtn.textContent;
+    loginBtn.textContent = "🔄 Logging in...";
+  }
+
+  console.log("🔐 [Participant] Attempting login...");
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password, role: "participant" })
+    });
+
+    const data = await res.json();
+    console.log("📊 [Participant] Login response:", data);
+
+    if (!res.ok || !data.success) {
+      clearParticipantSessionStorage({ preserveSelection: true });
+      showParticipantLoginError(INVALID_LOGIN_MESSAGE);
+      return;
+    }
+
+    const currentUserId = String(data.userId || "");
+    credentialsResetVersion = String(data.credentialsResetVersion || "1");
+
+    authToken = data.token;
+    participantUsername = data.username;
+
+    localStorage.setItem(CREDENTIALS_RESET_VERSION_KEY, credentialsResetVersion);
+    localStorage.setItem("authToken", authToken);
+    localStorage.setItem("participantUsername", participantUsername);
+    localStorage.setItem("participantUserId", currentUserId);
+    localStorage.setItem("userRole", "participant");
+
+    hideParticipantLogin();
+    showMainContent();
+    startAutoRefresh();
+    loadProblems();
+  } catch (error) {
+    console.error("❌ [Participant] Login error:", error);
+    clearParticipantSessionStorage({ preserveSelection: true });
+    showParticipantLoginError(INVALID_LOGIN_MESSAGE);
+  } finally {
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.textContent = loginBtn.dataset.originalText || "Login as Participant";
+      delete loginBtn.dataset.originalText;
+    }
+  }
+}
+
+// ==================== ADMIN LOGIN FROM HOME PAGE ====================
+
+async function participantAdminLogin(triggerEvent) {
+  const email = document.getElementById("adminEmail").value.trim();
+  const password = document.getElementById("adminPassword").value.trim();
+  const loginBtn = (triggerEvent && triggerEvent.target) || document.getElementById("adminLoginBtn");
+
+  if (!email || !password) {
+    showParticipantLoginError("Please enter email and password");
+    return;
+  }
+
+  if (loginBtn) {
+    loginBtn.disabled = true;
+    loginBtn.dataset.originalText = loginBtn.textContent;
+    loginBtn.textContent = "🔄 Logging in...";
+  }
+
+  console.log("🔐 [Admin] Attempting login from home...");
+
+  try {
+    const res = await fetch("/api/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password, role: "admin" })
+    });
+
+    const data = await res.json();
+    console.log("📊 [Admin] Login response:", data);
+
+    if (!res.ok || !data.success) {
+      clearAdminSessionStorage();
+      showParticipantLoginError(INVALID_LOGIN_MESSAGE);
+      return;
+    }
+
+    authToken = data.token;
+    localStorage.setItem("authToken", authToken);
+    localStorage.setItem("adminEmail", email);
+    localStorage.setItem("userRole", "admin");
+
+    window.location.href = "/admin.html";
+  } catch (error) {
+    console.error("❌ [Admin] Login error:", error);
+    clearAdminSessionStorage();
+    showParticipantLoginError(INVALID_LOGIN_MESSAGE);
+  } finally {
+    if (loginBtn) {
+      loginBtn.disabled = false;
+      loginBtn.textContent = loginBtn.dataset.originalText || "Login as Admin";
+      delete loginBtn.dataset.originalText;
+    }
+  }
+}
+
+// ==================== ROLE SELECTION ====================
+
+function selectRole(role) {
+  currentRole = role;
+  
+  // Update role button styles
+  const participantBtn = document.getElementById("participantRoleBtn");
+  const adminBtn = document.getElementById("adminRoleBtn");
+  
+  if (role === "participant") {
+    participantBtn.classList.add("active");
+    adminBtn.classList.remove("active");
+    document.getElementById("participantLoginForm").style.display = "block";
+    document.getElementById("adminConfirmation").style.display = "none";
+    document.getElementById("adminLoginForm").style.display = "none";
+  } else if (role === "admin") {
+    participantBtn.classList.remove("active");
+    adminBtn.classList.add("active");
+    document.getElementById("participantLoginForm").style.display = "none";
+    document.getElementById("adminConfirmation").style.display = "block";
+    document.getElementById("adminLoginForm").style.display = "none";
+  }
+  
+  // Clear error message
+  hideParticipantLoginError();
+  
+  // Clear previous form values
+  document.getElementById("participantUsername").value = "";
+  document.getElementById("participantPassword").value = "";
+  document.getElementById("adminEmail").value = "";
+  document.getElementById("adminPassword").value = "";
+  
+  console.log(`✅ [Auth] Switched to ${role} login`);
+}
+
+// ==================== ADMIN CONFIRMATION ====================
+
+function proceedToAdminLogin() {
+  // Hide confirmation, show login form
+  document.getElementById("adminConfirmation").style.display = "none";
+  document.getElementById("adminLoginForm").style.display = "block";
+  console.log("🔐 [Admin] Proceeding to login form");
+  // Focus on email input
+  setTimeout(() => document.getElementById("adminEmail").focus(), 100);
+}
+
+function goBackToRoleSelection() {
+  // Go back to role selection
+  selectRole("participant");
+  console.log("↩️ [Admin] Going back to role selection");
+}
+
+function participantLogout() {
+  console.log("🚪 [Participant] Logging out...");
+
+  // Clear auth session but keep selected problem lock for same user re-login.
+  clearParticipantSessionStorage({ preserveSelection: true });
+
+  authToken = null;
+  currentRole = "participant";
+  clearInterval(autoRefreshInterval);
+  autoRefreshInterval = null;
+  participantUsername = null;
+
+  // Show login form
+  showParticipantLogin();
+  hideMainContent();
+  
+  // Clear form values
+  document.getElementById("participantUsername").value = "";
+  document.getElementById("participantPassword").value = "";
+  document.getElementById("adminEmail").value = "";
+  document.getElementById("adminPassword").value = "";
+  hideParticipantLoginError();
+  selectRole("participant"); // Reset to participant role
+}
+
+function showParticipantLogin() {
+  document.getElementById("participantLoginContainer").style.display = "flex";
+}
+
+function hideParticipantLogin() {
+  document.getElementById("participantLoginContainer").style.display = "none";
+}
+
+function showMainContent() {
+  document.getElementById("mainHeader").style.display = "block";
+  document.getElementById("mainContent").style.display = "block";
+  document.getElementById("problems").innerHTML = `<p class="loading">Loading problems...</p>`;
+}
+
+function hideMainContent() {
+  document.getElementById("mainHeader").style.display = "none";
+  document.getElementById("mainContent").style.display = "none";
+}
+
+function showParticipantLoginError(message) {
+  const errorDiv = document.getElementById("participantLoginError");
+  errorDiv.textContent = message;
+  errorDiv.classList.add("show");
+  clearTimeout(window.participantLoginErrorTimer);
+  window.participantLoginErrorTimer = setTimeout(() => {
+    errorDiv.classList.remove("show");
+  }, 5000);
+}
+
+function hideParticipantLoginError() {
+  const errorDiv = document.getElementById("participantLoginError");
+  errorDiv.classList.remove("show");
+}
+
+// ==================== CHECK AUTH ON LOAD ====================
+
+window.addEventListener("DOMContentLoaded", async function() {
+  console.log("✅ [Participant] Page loaded");
+  const participantLoginBtn = document.getElementById("participantLoginBtn");
+  const adminLoginBtn = document.getElementById("adminLoginBtn");
+  const participantUsernameInput = document.getElementById("participantUsername");
+  const participantPasswordInput = document.getElementById("participantPassword");
+  const adminEmailInput = document.getElementById("adminEmail");
+  const adminPasswordInput = document.getElementById("adminPassword");
+  const attendanceRoomBtn = document.getElementById("attendanceRoomBtn");
+
+  if (attendanceRoomBtn) {
+    attendanceRoomBtn.style.display = "none";
+  }
+
+  if (participantLoginBtn) {
+    participantLoginBtn.addEventListener("click", participantLoginFromHome);
+  }
+
+  if (adminLoginBtn) {
+    adminLoginBtn.addEventListener("click", participantAdminLogin);
+  }
+
+  [participantUsernameInput, participantPasswordInput].forEach((input) => {
+    if (input) {
+      input.addEventListener("keydown", function(event) {
+        if (event.key === "Enter") {
+          participantLoginFromHome();
+        }
+      });
+    }
+  });
+
+  [adminEmailInput, adminPasswordInput].forEach((input) => {
+    if (input) {
+      input.addEventListener("keydown", function(event) {
+        if (event.key === "Enter") {
+          participantAdminLogin();
+        }
+      });
+    }
+  });
+  const savedToken = localStorage.getItem("authToken");
+  const savedRole = localStorage.getItem("userRole");
+  
+  if (savedToken && savedRole === "participant") {
+    const validation = await validateStoredSession(savedToken, "participant");
+
+    if (validation.valid) {
+      authToken = validation.data.token;
+      participantUsername = validation.data.username;
+      credentialsResetVersion = String(validation.data.credentialsResetVersion || localStorage.getItem(CREDENTIALS_RESET_VERSION_KEY) || "1");
+
+      localStorage.setItem(CREDENTIALS_RESET_VERSION_KEY, credentialsResetVersion);
+      localStorage.setItem("authToken", authToken);
+      localStorage.setItem("participantUsername", participantUsername);
+      localStorage.setItem("participantUserId", String(validation.data.userId || ""));
+      localStorage.setItem("userRole", "participant");
+
+      console.log("✅ [Participant] Restored session for:", participantUsername);
+      hideParticipantLogin();
+      showMainContent();
+      loadProblems();
+      startAutoRefresh();
+    } else {
+      clearParticipantSessionStorage({ preserveSelection: true });
+      console.warn("⚠️ [Participant] Saved session is invalid");
+      showParticipantLogin();
+      hideMainContent();
+      showParticipantLoginError(INVALID_LOGIN_MESSAGE);
+    }
+  } else if (savedToken && savedRole === "admin") {
+    const validation = await validateStoredSession(savedToken, "admin");
+
+    if (validation.valid) {
+      localStorage.setItem("authToken", validation.data.token);
+      localStorage.setItem("adminEmail", validation.data.email || localStorage.getItem("adminEmail") || "");
+      localStorage.setItem("userRole", "admin");
+      window.location.href = "/admin.html";
+    } else {
+      clearAdminSessionStorage();
+      console.warn("⚠️ [Admin] Saved session is invalid");
+      showParticipantLogin();
+      hideMainContent();
+      showParticipantLoginError(INVALID_LOGIN_MESSAGE);
+    }
+  } else {
+    console.log("ℹ️ [Participant] No saved session");
+    showParticipantLogin();
+    hideMainContent();
+  }
+});
+
 // ==================== PAGE INITIALIZATION ====================
 
 const teamNames = {};
@@ -5,10 +440,59 @@ let selectedProblemId = null;
 let allProblems = [];
 let autoRefreshInterval = null;
 
-window.onload = function() {
-  loadProblems();
-  startAutoRefresh();
-};
+function getSubmittedProblemStorageKey() {
+  return getSubmittedProblemStorageKeyForUsername(participantUsername);
+}
+
+function getSubmittedTeamStorageKey() {
+  return getSubmittedTeamStorageKeyForUsername(participantUsername);
+}
+
+function getSubmittedProblemId() {
+  return localStorage.getItem(getSubmittedProblemStorageKey());
+}
+
+function setSubmittedProblemId(problemId) {
+  localStorage.setItem(getSubmittedProblemStorageKey(), problemId);
+}
+
+function getSubmittedTeamName() {
+  return localStorage.getItem(getSubmittedTeamStorageKey());
+}
+
+function setSubmittedTeamName(teamName) {
+  localStorage.setItem(getSubmittedTeamStorageKey(), teamName);
+}
+
+function clearSubmittedProblemId() {
+  localStorage.removeItem(getSubmittedProblemStorageKey());
+}
+
+function clearSubmittedTeamName() {
+  localStorage.removeItem(getSubmittedTeamStorageKey());
+}
+
+function clearStoredSubmissionLock() {
+  clearSubmittedProblemId();
+  clearSubmittedTeamName();
+}
+
+function getSubmissionProblemIdFromRecord(submission) {
+  if (submission?.problemId) {
+    return String(submission.problemId);
+  }
+
+  if (Array.isArray(submission?.problem) && submission.problem[0]?._id) {
+    return String(submission.problem[0]._id);
+  }
+
+  return null;
+}
+
+async function syncSubmissionLockWithDatabase(storedProblemId) {
+  // Preserve participant lock state even if records are modified directly in MongoDB.
+  return storedProblemId || null;
+}
 
 function startAutoRefresh() {
   // Auto-refresh every 15 seconds to sync with admin changes
@@ -21,6 +505,11 @@ function startAutoRefresh() {
 
 async function loadProblems() {
   const container = document.getElementById("problems");
+
+  const isSessionValid = await ensureActiveParticipantSession();
+  if (!isSessionValid) {
+    return;
+  }
   
   try {
     const res = await fetch("/api/getProblems?t=" + Date.now()); // Bypass cache
@@ -31,6 +520,22 @@ async function loadProblems() {
 
     const data = await res.json();
     allProblems = data || [];
+
+    let problemsToRender = Array.isArray(data) ? [...data] : [];
+    let submittedProblemId = getSubmittedProblemId();
+    submittedProblemId = await syncSubmissionLockWithDatabase(submittedProblemId);
+
+    // If this participant already submitted, only show their selected problem.
+    if (submittedProblemId) {
+      const submittedProblem = problemsToRender.find((problem) => problem._id === submittedProblemId);
+
+      if (submittedProblem) {
+        problemsToRender = [submittedProblem];
+      } else {
+        // Keep lock behavior strict: never fall back to all problems for locked users.
+        problemsToRender = [];
+      }
+    }
 
     container.innerHTML = "";
 
@@ -48,9 +553,22 @@ async function loadProblems() {
     }
 
     // Render problem cards
-    data.forEach((p, index) => {
+    if (problemsToRender.length === 0) {
+      container.innerHTML = `
+        <div class="empty-state">
+          <h2>📭 No Problems Available</h2>
+          <p>The selected problem is no longer available.</p>
+          <button onclick="location.reload()" class="btn-secondary">Refresh Page</button>
+        </div>
+      `;
+      return;
+    }
+
+    problemsToRender.forEach((p, index) => {
       const isFull = p.selectedTeams >= p.maxTeams;
       const isSelected = teamNames[p._id] ? true : false;
+      const hasSubmittedProblem = Boolean(submittedProblemId);
+      const isLockedForUser = hasSubmittedProblem;
 
       const div = document.createElement("div");
       div.className = "card";
@@ -71,21 +589,21 @@ async function loadProblems() {
         <div class="card-footer">
           <div class="selection-area">
             <button 
-              class="problem-circle ${isSelected ? 'selected' : ''} ${isFull ? 'disabled' : ''}"
+              class="problem-circle ${isSelected ? 'selected' : ''} ${isFull || isLockedForUser ? 'disabled' : ''}"
               onclick="openTeamNameModal('${p._id}')" 
-              ${isFull ? 'disabled' : ''}
-              title="${isSelected ? 'Team: ' + teamNames[p._id] : 'Click to select this problem'}"
+              ${isFull || isLockedForUser ? 'disabled' : ''}
+              title="${hasSubmittedProblem ? 'Team details are locked after submission' : (isSelected ? 'Team: ' + teamNames[p._id] : 'Click to select this problem')}"
             >
               ${isSelected ? '✓' : '◯'}
             </button>
             ${isSelected ? `<p class="selected-team">Team: ${teamNames[p._id]}</p>` : ''}
           </div>
           <button 
-            class="btn-submit ${!isSelected || isFull ? 'disabled' : ''}"
+            class="btn-submit ${!isSelected || isFull || isLockedForUser ? 'disabled' : ''}"
             onclick="submit('${p._id}')" 
-            ${!isSelected || isFull ? 'disabled' : ''}
+            ${!isSelected || isFull || isLockedForUser ? 'disabled' : ''}
           >
-            ${isFull ? '🔒 FULL' : isSelected ? 'Submit Team' : 'Select'}
+            ${isLockedForUser ? '✅ Submitted' : (isFull ? '🔒 FULL' : isSelected ? 'Submit Team' : 'Select')}
           </button>
         </div>
       `;
@@ -105,6 +623,12 @@ async function loadProblems() {
 }
 
 function openTeamNameModal(problemId) {
+  // Once a team submits, lock team-name edits for that account.
+  if (getSubmittedProblemId()) {
+    alert("✅ You have already submitted. Team details are locked.");
+    return;
+  }
+
   selectedProblemId = problemId;
   const currentName = teamNames[problemId] || "";
   
@@ -159,6 +683,8 @@ async function submit(problemId) {
 
     if (res.ok) {
       alert("✅ Team submitted successfully!");
+      setSubmittedProblemId(problemId);
+      setSubmittedTeamName(teamName);
       delete teamNames[problemId];
       loadProblems();
     } else {
