@@ -3,7 +3,7 @@
 let authToken = null;
 let participantUsername = null;
 let currentRole = "participant"; // Default role
-const INVALID_LOGIN_MESSAGE = "Invalid credentials";
+const INVALID_LOGIN_MESSAGE = "Enter valid details";
 
 const PARTICIPANT_SELECTION_SCOPE_KEY = "participantSelectionScope";
 let participantSelectionScope = null;
@@ -352,16 +352,29 @@ function hideMainContent() {
 function showParticipantLoginError(message) {
   const errorDiv = document.getElementById("participantLoginError");
   errorDiv.textContent = message;
+  errorDiv.style.background = "#ffe5e5";
+  errorDiv.style.color = "#b00020";
+  errorDiv.style.fontWeight = "800";
+  errorDiv.style.fontSize = "1rem";
+  errorDiv.style.borderLeft = "6px solid #b00020";
+  errorDiv.style.padding = "12px";
+  errorDiv.style.borderRadius = "5px";
+  errorDiv.style.marginTop = "15px";
+  errorDiv.style.display = "block";
+  errorDiv.style.visibility = "visible";
+  errorDiv.style.opacity = "1";
   errorDiv.classList.add("show");
   clearTimeout(window.participantLoginErrorTimer);
   window.participantLoginErrorTimer = setTimeout(() => {
     errorDiv.classList.remove("show");
+    errorDiv.style.display = "none";
   }, 5000);
 }
 
 function hideParticipantLoginError() {
   const errorDiv = document.getElementById("participantLoginError");
   errorDiv.classList.remove("show");
+  errorDiv.style.display = "none";
 }
 
 // ==================== CHECK AUTH ON LOAD ====================

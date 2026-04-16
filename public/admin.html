@@ -7,7 +7,7 @@
   <link rel="stylesheet" href="css/style.css">
   <link rel="stylesheet" href="css/admin-style.css">
 </head>
-<body>
+<body style="visibility:hidden;">
 
 <div id="loginContainer" class="login-container">
   <div class="login-box">
@@ -82,9 +82,6 @@
       <h1>🚀 StartInno Admin - Problem Statements</h1>
     </div>
     <div class="navbar-right">
-      <button onclick="uploadFromDriveLink()" class="btn-upload-drive" title="Upload file from drive link">☁️ Upload</button>
-      <button onclick="deleteUploadedFile()" class="btn-delete-file" title="Delete uploaded file">🗑️ Delete File</button>
-      <button onclick="deleteAllTeamsAndSubmissions()" class="btn-remove-all" title="Delete all teams and submissions">🗑️ Remove All</button>
       <button onclick="resetLoginCredentials()" class="btn-reset-login" title="Reset all login credential mappings">🔄 Reset Login</button>
       <button onclick="openChangePasswordModal()" class="btn-change-pwd" title="Change admin password">🔑 Change Password</button>
       <span id="adminEmailDisplay"></span>
@@ -93,6 +90,18 @@
   </nav>
 
   <div class="admin-content">
+    <!-- File Management Section -->
+    <div class="section-container">
+      <div class="section-header">
+        <h2>☁️ File Management</h2>
+      </div>
+
+      <div class="file-management-actions" style="display:flex; gap:12px; flex-wrap:wrap; align-items:center; margin-top:16px;">
+        <button onclick="uploadFromDriveLink()" class="btn-upload-drive" title="Upload file from drive link">☁️ Upload</button>
+        <button onclick="deleteUploadedFile()" class="btn-delete-file" title="Delete uploaded file">🗑️ Delete File</button>
+      </div>
+    </div>
+
     <!-- Dashboard Section -->
     <div class="section-container">
       <div class="section-header">

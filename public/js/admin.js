@@ -6,7 +6,7 @@ let problemToDelete = null;
 let problemToEdit = null;
 let adminProblemsCache = [];
 let adminSubmissionsCache = [];
-const INVALID_LOGIN_MESSAGE = "Invalid credentials";
+const INVALID_LOGIN_MESSAGE = "Enter valid details";
 
 function clearAdminSessionStorage() {
   localStorage.removeItem("authToken");
@@ -363,12 +363,24 @@ function selectRole(role) {
 function showLoginError(message) {
   const errorDiv = document.getElementById("loginError");
   errorDiv.textContent = message;
+  errorDiv.style.background = "#ffe5e5";
+  errorDiv.style.color = "#b00020";
+  errorDiv.style.fontWeight = "800";
+  errorDiv.style.fontSize = "1rem";
+  errorDiv.style.borderLeft = "6px solid #b00020";
+  errorDiv.style.padding = "12px";
+  errorDiv.style.borderRadius = "5px";
+  errorDiv.style.marginTop = "15px";
+  errorDiv.style.display = "block";
+  errorDiv.style.visibility = "visible";
+  errorDiv.style.opacity = "1";
   errorDiv.classList.add("show");
 }
 
 function hideLoginError() {
   const errorDiv = document.getElementById("loginError");
   errorDiv.classList.remove("show");
+  errorDiv.style.display = "none";
 }
 
 function handleLoginKeyPress(event) {
@@ -500,6 +512,7 @@ function adminLogout() {
 
 window.addEventListener("DOMContentLoaded", async function() {
   console.log("✅ [Admin] Page loaded");
+  document.body.style.visibility = "hidden";
   const savedToken = localStorage.getItem("authToken");
   const savedRole = localStorage.getItem("userRole");
   
@@ -518,6 +531,7 @@ window.addEventListener("DOMContentLoaded", async function() {
       document.getElementById("loginContainer").style.display = "none";
       document.getElementById("adminContainer").style.display = "block";
       document.getElementById("adminEmailDisplay").textContent = adminEmail;
+      document.body.style.visibility = "visible";
 
       console.log("✅ [Admin] Restored session for:", adminEmail);
       loadStatements();
